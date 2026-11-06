@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Drop Ceiling V2: first setup of the tower, straight after a clean Ubuntu 24.04 Desktop install.
+# Drop Ceiling V2: first setup of the tower, straight after a clean Ubuntu LTS Desktop install, 24.04 or 26.04.
 # Run it at the tower, signed in as nick, connected to the wifi. Safe to run again.
 #
 #   wget https://raw.githubusercontent.com/npuckett/setupLinuxBox1/main/setup_cvtower.sh
@@ -32,7 +32,7 @@ fail() { REPORT="$REPORT  FAILED  $*"$'\n'; FAILED=1; }
 refuse() { printf 'STOPPED: %s\n' "$*"; exit 1; }
 
 say "Checking this is the right machine"
-grep -q 'VERSION_ID="24.04"' "$OS_RELEASE" || refuse "this expects Ubuntu 24.04, and $OS_RELEASE says otherwise. Nothing was changed."
+grep -Eq 'VERSION_ID="(24|26)[.]04"' "$OS_RELEASE" || refuse "this expects Ubuntu 24.04 or 26.04 LTS, and this is $(sed -n 's/^PRETTY_NAME="\(.*\)"/\1/p' "$OS_RELEASE"). Tell Claude which. Nothing was changed."
 [ "$(id -u)" != 0 ] || refuse "run it as $EXPECT_USER, not with sudo. It asks for your password itself. Nothing was changed."
 [ "$(hostname)" = "$EXPECT_HOST" ] || refuse "this computer is called $(hostname), and the ops scripts expect $EXPECT_HOST. Nothing was changed."
 [ "$(id -un)" = "$EXPECT_USER" ] || refuse "you are signed in as $(id -un), and the ops scripts expect $EXPECT_USER. Nothing was changed."
