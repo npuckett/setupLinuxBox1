@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Drop Ceiling V2: first setup of the tower, straight after a clean Ubuntu LTS Desktop install, 24.04 or 26.04.
-# Run it at the tower, signed in as nick, connected to the wifi. Safe to run again.
+# Run it at the tower, signed in as cbtower, connected to the wifi. Safe to run again.
 #
 #   wget https://raw.githubusercontent.com/npuckett/setupLinuxBox1/main/setup_cvtower.sh
 #   bash setup_cvtower.sh
@@ -15,7 +15,7 @@
 set -uo pipefail
 
 EXPECT_HOST=cvtower
-EXPECT_USER=nick
+EXPECT_USER=cbtower
 OS_RELEASE=${DC_OS_RELEASE:-/etc/os-release}
 LOG="$HOME/setup_cvtower.log"
 
