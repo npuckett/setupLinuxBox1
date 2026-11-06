@@ -2,7 +2,7 @@
 # Drop Ceiling V2: first setup of the tower, straight after a clean Ubuntu 24.04 Desktop install.
 # Run it at the tower, signed in as nick, connected to the wifi. Safe to run again.
 #
-#   curl -fsSL https://raw.githubusercontent.com/npuckett/setupLinuxBox1/main/setup_cvtower.sh -o setup_cvtower.sh
+#   wget https://raw.githubusercontent.com/npuckett/setupLinuxBox1/main/setup_cvtower.sh
 #   bash setup_cvtower.sh
 #
 # It updates the system, installs SSH, Tailscale and the NVIDIA driver, and stops the machine sleeping, so it can be reached
@@ -36,7 +36,14 @@ grep -q 'VERSION_ID="24.04"' "$OS_RELEASE" || refuse "this expects Ubuntu 24.04,
 [ "$(id -u)" != 0 ] || refuse "run it as $EXPECT_USER, not with sudo. It asks for your password itself. Nothing was changed."
 [ "$(hostname)" = "$EXPECT_HOST" ] || refuse "this computer is called $(hostname), and the ops scripts expect $EXPECT_HOST. Nothing was changed."
 [ "$(id -un)" = "$EXPECT_USER" ] || refuse "you are signed in as $(id -un), and the ops scripts expect $EXPECT_USER. Nothing was changed."
-curl -fsS --max-time 20 -o /dev/null https://tailscale.com/ || refuse "no internet from here. Connect to the wifi, then run it again. Nothing was changed."
+# A clean install may have no curl yet, and this script is what installs it.
+online() {
+  if command -v curl >/dev/null 2>&1; then curl -fsS --max-time 20 -o /dev/null https://tailscale.com/
+  elif command -v wget >/dev/null 2>&1; then wget -q --spider --timeout=20 https://tailscale.com/
+  else getent hosts tailscale.com >/dev/null
+  fi
+}
+online || refuse "no internet from here. Connect to the wifi, then run it again. Nothing was changed."
 
 sudo -v || refuse "sudo did not accept the password. Nothing was changed."
 # Updates can outlast sudo's 15 minutes, so keep it alive until this script ends.
@@ -48,7 +55,16 @@ trap 'kill "$KEEPALIVE" 2>/dev/null' EXIT
 apt_get() { sudo env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confold "$@"; }
 
 say "Updating the system. This can take a while"
-if apt_get update && apt_get -y full-upgrade; then pass "system updated"; else fail "system update. Run it again, and look in $LOG if it repeats"; fi
+if ! apt_get update --error-on=any; then
+  echo
+  echo "STOPPED: apt could not read Ubuntu's package servers, so nothing can be installed. The error is above."
+  echo "  Release file not valid yet, or a certificate error: the clock is wrong. Set the date and time, then run this again."
+  echo "  Could not resolve, or timed out: the wifi isn't really online, or it has a login page. Open a browser and check."
+  echo "  500, 503 or 404 from a server: that mirror is having trouble. Wait a few minutes, or use the main server with:"
+  echo "    sudo sed -i -E 's#https?://[a-z0-9.-]*archive[.]ubuntu[.]com#http://archive.ubuntu.com#' /etc/apt/sources.list.d/ubuntu.sources"
+  exit 1
+fi
+if apt_get -y full-upgrade; then pass "system updated"; else fail "system update. Run it again, and look in $LOG if it repeats"; fi
 
 say "Installing the basics"
 if apt_get -y install openssh-server curl git jq mokutil ubuntu-drivers-common; then pass "SSH, curl, git, jq installed"; else fail "basic packages"; fi
