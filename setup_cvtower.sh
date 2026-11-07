@@ -5,8 +5,8 @@
 #   wget https://raw.githubusercontent.com/npuckett/setupLinuxBox1/main/setup_cvtower.sh
 #   bash setup_cvtower.sh
 #
-# It updates the system, installs SSH, Tailscale and the NVIDIA driver, and stops the machine sleeping, so it can be reached
-# from elsewhere. It holds no secrets. You type your password once for sudo, and sign in to Tailscale from the link it prints.
+# It updates the system, installs SSH, Tailscale and the NVIDIA driver, stops the machine sleeping, and signs the desktop in
+# by itself after a restart, so it can be reached from elsewhere. It holds no secrets. You type your password once for sudo, and sign in to Tailscale from the link it prints.
 #
 # It leaves out what V1's linux_cv_setup.sh added: remote desktop (too slow over wifi), and software this machine no
 # longer runs from a desktop. Python, torch and the rest come later, over SSH, and so do the firewall and SSH lock-down.
@@ -17,6 +17,7 @@ set -uo pipefail
 EXPECT_HOST=cvtower
 EXPECT_USER=cbtower
 OS_RELEASE=${DC_OS_RELEASE:-/etc/os-release}
+GDM_CONF=${DC_GDM_CONF:-/etc/gdm3/custom.conf}
 LOG="$HOME/setup_cvtower.log"
 
 exec > >(tee -a "$LOG") 2>&1
@@ -78,6 +79,19 @@ sudo install -d /etc/systemd/sleep.conf.d /etc/systemd/logind.conf.d
 printf '[Sleep]\nAllowSuspend=no\nAllowHibernation=no\nAllowSuspendThenHibernate=no\nAllowHybridSleep=no\n' | sudo tee /etc/systemd/sleep.conf.d/50-dc-never.conf >/dev/null
 printf '[Login]\nIdleAction=ignore\nHandleSuspendKey=ignore\nHandleHibernateKey=ignore\nHandleLidSwitch=ignore\n' | sudo tee /etc/systemd/logind.conf.d/50-dc-never.conf >/dev/null
 if sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target; then pass "sleep is off"; else fail "could not turn sleep off"; fi
+
+say "Signing the desktop in by itself after a restart"
+# For the desktop only: simulations, wifi and Tailscale all start with nobody signed in.
+autologin_on() { grep -Eq '^AutomaticLoginEnable *= *true' "$GDM_CONF" && grep -Eq "^AutomaticLogin *= *$EXPECT_USER\$" "$GDM_CONF"; }
+if [ ! -f "$GDM_CONF" ]; then
+  warn "No $GDM_CONF, so the desktop won't sign in by itself after a restart"
+elif autologin_on; then
+  pass "Desktop signs in by itself after a restart"
+elif sudo sed -i.bak -E "s/^#? *AutomaticLoginEnable *=.*/AutomaticLoginEnable = true/; s/^#? *AutomaticLogin *=.*/AutomaticLogin = $EXPECT_USER/" "$GDM_CONF" && autologin_on; then
+  pass "Desktop now signs in by itself after a restart. It starts at the next boot"
+else
+  fail "could not turn on automatic sign-in in $GDM_CONF"
+fi
 
 say "NVIDIA driver"
 if [ "$(mokutil --sb-state 2>/dev/null | grep -c enabled)" != 0 ]; then
